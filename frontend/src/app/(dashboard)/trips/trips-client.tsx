@@ -156,7 +156,7 @@ export function TripsClient({
               startDate={trip.startDate}
               endDate={trip.endDate}
               totalBudget={trip.totalBudget}
-              destinations={trip.stops.map((s) => s.destinationId)}
+              destinations={trip.stops.map((s) => s.destination?.name ?? s.destinationId)}
               index={i}
               onDelete={handleDelete}
             />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useForm } from "react-hook-form"
@@ -10,10 +10,10 @@ import {
   ArrowLeft, ArrowRight, Check, Globe, MapPin, Calendar,
   Wallet, Camera, Loader2, Plus, X
 } from "lucide-react"
-import { DESTINATIONS } from "@/lib/data"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
+import type { Destination } from "@/types/travel"
 
 /* ── Schema ─────────────────────────────── */
 const Step1Schema = z.object({
@@ -44,12 +44,20 @@ const STEPS = [
   { id: 5, label: "Cover", icon: Camera },
 ]
 
-const COVER_IMAGES = DESTINATIONS.map((d) => ({ id: d.id, url: d.image, label: d.name }))
-
 export default function NewTripPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [isCreating, setIsCreating] = useState(false)
+  const [destinations, setDestinations] = useState<Destination[]>([])
+
+  useEffect(() => {
+    fetch("/api/destinations")
+      .then((res) => res.json())
+      .then((data: unknown) => setDestinations(Array.isArray(data) ? data as Destination[] : []))
+      .catch(() => setDestinations([]))
+  }, [])
+
+  const coverImages = destinations.map((d) => ({ id: d.id, url: d.image, label: d.name }))
 
   // Collected data
   const [tripData, setTripData] = useState({
@@ -58,10 +66,12 @@ export default function NewTripPage() {
     endDate: "",
     totalBudget: 50000,
     currency: "INR",
-    coverImage: COVER_IMAGES[0].url,
+    coverImage: "",
     stops: [] as { destinationId: string; name: string; days: number; cost: number }[],
     notes: "",
   })
+
+  const selectedCoverImage = tripData.coverImage || coverImages[0]?.url || ""
 
   const inputClass = (err?: boolean) =>
     cn(
@@ -82,7 +92,7 @@ export default function NewTripPage() {
           endDate: tripData.endDate || null,
           totalBudget: tripData.totalBudget,
           currency: tripData.currency,
-          coverImage: tripData.coverImage,
+          coverImage: selectedCoverImage || undefined,
           notes: tripData.notes,
         }),
       })
@@ -243,7 +253,7 @@ export default function NewTripPage() {
                 <div>
                   <label className="text-sm font-medium text-foreground mb-3 block">Select Destinations</label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
-                    {DESTINATIONS.filter(d => !tripData.stops.find(s => s.destinationId === d.id)).map((dest) => (
+                    {destinations.filter(d => !tripData.stops.find(s => s.destinationId === d.id)).map((dest) => (
                       <button
                         key={dest.id}
                         onClick={() => setTripData(d => ({
@@ -269,6 +279,9 @@ export default function NewTripPage() {
                       </button>
                     ))}
                   </div>
+                  {destinations.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-6">Loading destinations...</p>
+                  )}
                 </div>
               )}
             </motion.div>
@@ -384,19 +397,19 @@ export default function NewTripPage() {
                 <p className="text-muted-foreground text-sm">Pick an image that captures your trip</p>
               </div>
               <div className="grid grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
-                {COVER_IMAGES.map((img) => (
+                {coverImages.map((img) => (
                   <button
                     key={img.id}
                     onClick={() => setTripData(d => ({ ...d, coverImage: img.url }))}
                     className={cn(
                       "relative h-24 rounded-xl overflow-hidden transition-all",
-                      tripData.coverImage === img.url
+                      selectedCoverImage === img.url
                         ? "ring-2 ring-[#7C8CFF] ring-offset-1 ring-offset-[#050609]"
                         : "hover:ring-1 hover:ring-white/20"
                     )}
                   >
                     <Image src={img.url} alt={img.label} fill className="object-cover" />
-                    {tripData.coverImage === img.url && (
+                    {selectedCoverImage === img.url && (
                       <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#7C8CFF] flex items-center justify-center">
                         <Check className="w-3 h-3 text-white" />
                       </div>

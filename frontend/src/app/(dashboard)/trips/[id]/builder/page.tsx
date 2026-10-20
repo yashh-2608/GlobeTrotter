@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { backendJson, BackendError } from "@/lib/backend-api"
 import type { Trip } from "@/types/travel"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { BuilderClient } from "./builder-client"
 
 export default async function BuilderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -15,9 +15,16 @@ export default async function BuilderPage({ params }: { params: Promise<{ id: st
     if (error instanceof BackendError && error.status === 404) {
       return null
     }
+    if (error instanceof BackendError && error.status === 401) {
+      return "unauthorized" as const
+    }
 
     throw error
   })
+
+  if (trip === "unauthorized") {
+    redirect("/login")
+  }
 
   if (!trip) {
     notFound()

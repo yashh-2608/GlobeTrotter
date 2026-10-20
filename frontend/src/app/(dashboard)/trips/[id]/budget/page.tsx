@@ -18,8 +18,15 @@ export default async function TripBudgetPage({ params }: { params: Promise<{ id:
     if (error instanceof BackendError && error.status === 404) {
       return null
     }
+    if (error instanceof BackendError && error.status === 401) {
+      return "unauthorized" as const
+    }
     throw error
   })
+
+  if (result === "unauthorized") {
+    redirect("/login")
+  }
 
   if (!result) {
     notFound()

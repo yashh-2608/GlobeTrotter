@@ -10,6 +10,7 @@ interface Activity {
   id: string
   title?: string
   scheduledTime?: string | null
+  scheduledDate?: string | Date | null
   duration?: string | null
   estimatedCost: number
   category?: string | null
@@ -131,9 +132,12 @@ export function ItineraryDay({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{activity.title}</p>
-                        {activity.duration && (
-                          <p className="text-xs text-muted-foreground">{activity.duration}</p>
+                        {(activity.category || activity.duration || activity.scheduledDate) && (
+                          <p className="text-xs text-muted-foreground">
+                            {[activity.category, activity.duration, activity.scheduledDate ? new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short" }).format(new Date(activity.scheduledDate)) : null].filter(Boolean).join(" · ")}
+                          </p>
                         )}
+                        {activity.notes && <p className="mt-1 whitespace-normal text-xs text-muted-foreground/80">{activity.notes}</p>}
                       </div>
 
                       {/* Cost */}

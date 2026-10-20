@@ -10,7 +10,6 @@ import { motion } from "framer-motion"
 import { Globe, Eye, EyeOff, ArrowRight, Loader2, User } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { buildDemoSession, setDemoSessionCookie } from "@/lib/demo-session"
 
 const RegisterSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -65,19 +64,7 @@ export default function RegisterPage() {
 
       if (!res.ok) {
         if (res.status >= 500 || !json) {
-          setDemoSessionCookie(
-            buildDemoSession({
-              id: `demo-${Date.now()}`,
-              name: data.name.trim(),
-              email: data.email,
-              username: data.username.toLowerCase(),
-              role: "USER",
-            })
-          )
-
-          toast.success("Demo account created. Opening your dashboard...")
-          router.push("/dashboard")
-          router.refresh()
+          toast.error("GlobeTrotter could not reach the account service. Start the backend and try again.")
           return
         }
 
@@ -89,19 +76,7 @@ export default function RegisterPage() {
       toast.success("Account created! Signing you in...")
       router.push("/login")
     } catch {
-      setDemoSessionCookie(
-        buildDemoSession({
-          id: `demo-${Date.now()}`,
-          name: data.name.trim(),
-          email: data.email,
-          username: data.username.toLowerCase(),
-          role: "USER",
-        })
-      )
-
-      toast.success("Demo account created. Opening your dashboard...")
-      router.push("/dashboard")
-      router.refresh()
+      toast.error("Unable to reach the account service. Start the backend and try again.")
     } finally {
       setIsLoading(false)
     }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Eye, EyeOff, Globe, ArrowRight, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { buildDemoSession, setDemoSessionCookie } from "@/lib/demo-session"
+import { clearDemoSessionCookie } from "@/lib/demo-session"
 import { isBackendHealthy } from "@/lib/backend-api"
 
 const LoginSchema = z.object({
@@ -34,8 +34,13 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
+  const sessionExpired = searchParams.get("sessionExpired") === "1"
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (sessionExpired) toast.error("Your session expired. Sign in again to continue your trip.")
+  }, [sessionExpired])
 
   const {
     register,
@@ -46,29 +51,11 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true)
     try {
+      clearDemoSessionCookie()
       const backendOnline = await isBackendHealthy()
 
       if (!backendOnline) {
-        const localPart = data.email.split("@")[0] || "explorer"
-        const name = localPart
-          .split(/[._-]+/)
-          .filter(Boolean)
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(" ") || "Explorer"
-
-        setDemoSessionCookie(
-          buildDemoSession({
-            id: `demo-${Date.now()}`,
-            name,
-            email: data.email,
-            username: localPart.toLowerCase(),
-            role: "USER",
-          })
-        )
-
-        toast.success("Demo session ready. Opening your dashboard...")
-        router.push(callbackUrl)
-        router.refresh()
+        toast.error("GlobeTrotter could not reach the trip service. Start the backend and try again.")
         return
       }
 
@@ -101,6 +88,7 @@ export default function LoginPage() {
           src={HERO_IMAGE}
           alt="Travel destination"
           fill
+          sizes="50vw"
           className="object-cover"
           priority
         />
@@ -261,12 +249,6 @@ export default function LoginPage() {
           </div>
 
           {/* Demo hint */}
-          <div className="mt-6 p-4 rounded-xl glass border border-border">
-            <p className="text-xs text-muted-foreground text-center">
-              <span className="text-primary font-medium">Demo: </span>
-              Register a new account to get started — no email verification required.
-            </p>
-          </div>
         </motion.div>
       </div>
     </div>

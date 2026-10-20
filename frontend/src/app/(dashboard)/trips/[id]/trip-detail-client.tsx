@@ -99,10 +99,10 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
           </button>
           <div className="flex items-center gap-2">
             <Link
-              href={`/trips/${trip.id}/builder`}
+              href={`/trips/${trip.id}/edit`}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl glass text-muted-foreground hover:text-foreground text-sm transition-all"
             >
-              <Edit3 className="w-3.5 h-3.5" /> Edit
+              <Edit3 className="w-3.5 h-3.5" /> Edit details
             </Link>
             <button
               onClick={handleShare}
@@ -197,7 +197,7 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
                   stops={trip.stops.map((s) => ({
                     id: s.id,
                     destinationId: s.destinationId,
-                    destinationName: s.destinationId.replace(/-/g, " "),
+                    destinationName: s.destination?.name ?? s.destinationId,
                     startDate: s.startDate,
                     endDate: s.endDate,
                     daysCount: s.daysCount,
@@ -264,7 +264,7 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
                     key={stop.id}
                     dayNumber={i + 1}
                     date={stop.startDate ? formatDate(stop.startDate) : undefined}
-                    city={stop.destinationId.replace(/-/g, " ")}
+                    city={stop.destination?.name ?? stop.destinationId}
                     activities={stop.activities}
                     totalCost={stop.estimatedCost + stop.activities.reduce((a, act) => a + act.estimatedCost, 0)}
                   />

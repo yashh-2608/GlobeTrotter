@@ -24,11 +24,12 @@ export default function ActivitiesPage() {
 
     fetch("/api/activities")
       .then((res) => res.json())
-      .then((data: ActivityResult[]) => {
+      .then((data: unknown) => {
         if (cancelled) return
-        setCategories(["All", ...Array.from(new Set(data.map((item) => item.category).filter(Boolean)))] as string[])
+        const arr = Array.isArray(data) ? data as ActivityResult[] : []
+        setCategories(["All", ...Array.from(new Set(arr.map((item) => item.category).filter(Boolean)))] as string[])
         const uniqueDestinations = new Map<string, string>()
-        for (const item of data) {
+        for (const item of arr) {
           if (item.destination) uniqueDestinations.set(item.destination.id, item.destination.name)
         }
         setDestinations(Array.from(uniqueDestinations, ([id, name]) => ({ id, name })))
@@ -52,7 +53,7 @@ export default function ActivitiesPage() {
       setIsLoading(true)
       fetch(`/api/activities${params.toString() ? `?${params}` : ""}`, { signal: controller.signal })
         .then((res) => res.json())
-        .then((data: ActivityResult[]) => setResults(data))
+        .then((data: unknown) => setResults(Array.isArray(data) ? data as ActivityResult[] : []))
         .catch((error) => {
           if (error.name !== "AbortError") setResults([])
         })

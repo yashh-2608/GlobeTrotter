@@ -23,6 +23,8 @@ export function errorMiddleware(
     return res.status(error.statusCode).json({ error: error.message })
   }
 
+  console.error("Internal Server Error:", error)
+
   return res.status(500).json({
     error: "Something went wrong while processing your request.",
   })

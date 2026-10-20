@@ -48,6 +48,7 @@ function HeroSection({ userName, nextTrip }: { userName: string; nextTrip: Trip 
           src={HERO_IMAGES[0]}
           alt="Hero destination"
           fill
+          sizes="100vw"
           className="object-cover"
           priority
         />
@@ -248,7 +249,7 @@ export function DashboardClient({
                   startDate={trip.startDate}
                   endDate={trip.endDate}
                   totalBudget={trip.totalBudget}
-                  destinations={trip.stops.map((s) => s.destinationId)}
+                  destinations={trip.stops.map((s) => s.destination?.name ?? s.destinationId)}
                   index={i}
                   onDelete={handleDeleteTrip}
                 />
@@ -308,7 +309,7 @@ export function DashboardClient({
                   startDate={trip.startDate}
                   endDate={trip.endDate}
                   totalBudget={trip.totalBudget}
-                  destinations={trip.stops.map((s) => s.destinationId)}
+                  destinations={trip.stops.map((s) => s.destination?.name ?? s.destinationId)}
                   index={i}
                 />
               ))}
