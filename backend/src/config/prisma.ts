@@ -2,13 +2,14 @@ import "dotenv/config"
 import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "../../generated/prisma/client"
 import { env } from "./env.js"
+import { postgresConfig } from "./postgres.js"
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString: env.DATABASE_URL })
+  const adapter = new PrismaPg(postgresConfig(env.DATABASE_URL))
   return new PrismaClient({ adapter })
 }
 

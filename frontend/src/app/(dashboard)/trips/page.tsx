@@ -16,7 +16,7 @@ export default async function TripsPage() {
     if (error instanceof BackendError && error.status === 401) {
       return null
     }
-    return []
+    throw error
   })
 
   if (trips === null) {

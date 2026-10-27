@@ -10,10 +10,9 @@ import {
 } from "lucide-react"
 import { TripCard } from "@/components/travel/trip-card"
 import { DestinationCard } from "@/components/travel/destination-card"
-import { DESTINATIONS } from "@/lib/data"
 import { formatDate, getDaysRemaining } from "@/lib/utils"
 import { toast } from "sonner"
-import type { Trip as TravelTrip } from "@/types/travel"
+import type { Trip as TravelTrip, Destination } from "@/types/travel"
 
 type Trip = TravelTrip
 
@@ -22,6 +21,7 @@ interface DashboardClientProps {
   upcomingTrips: Trip[]
   ongoingTrips: Trip[]
   completedTrips: Trip[]
+  destinations: Destination[]
 }
 
 const HERO_IMAGES = [
@@ -37,7 +37,7 @@ function getGreeting(name: string): string {
   return `Good evening, ${name}`
 }
 
-function HeroSection({ userName, nextTrip }: { userName: string; nextTrip: Trip | null }) {
+function HeroSection({ userName, nextTrip, trips }: { userName: string; nextTrip: Trip | null; trips: Trip[] }) {
   const daysLeft = nextTrip?.startDate ? getDaysRemaining(nextTrip.startDate) : null
 
   return (
@@ -124,9 +124,9 @@ function HeroSection({ userName, nextTrip }: { userName: string; nextTrip: Trip 
           className="mt-10 flex items-center gap-6"
         >
           {[
-            { icon: MapPin, value: "12", label: "Countries Visited" },
-            { icon: Calendar, value: "8", label: "Trips Planned" },
-            { icon: TrendingUp, value: "₹2.4L", label: "Avg Trip Budget" },
+            { icon: MapPin, value: String(new Set(trips.filter((trip) => trip.status === "COMPLETED").flatMap((trip) => trip.stops.map((stop) => stop.destination?.country).filter(Boolean))).size), label: "Countries visited" },
+            { icon: Calendar, value: String(trips.length), label: "Trips planned" },
+            { icon: TrendingUp, value: String(trips.reduce((sum, trip) => sum + trip.stops.length, 0)), label: "Destinations planned" },
           ].map(({ icon: Icon, value, label }) => (
             <div key={label} className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-white/8 flex items-center justify-center">
@@ -193,15 +193,17 @@ export function DashboardClient({
   upcomingTrips,
   ongoingTrips,
   completedTrips,
+  destinations,
 }: DashboardClientProps) {
   const router = useRouter()
   const allTrips = [...ongoingTrips, ...upcomingTrips, ...completedTrips]
   const nextTrip = upcomingTrips[0] ?? ongoingTrips[0] ?? null
-  const topDestinations = DESTINATIONS.slice(0, 6)
+  const topDestinations = destinations.slice(0, 6)
 
   const handleDeleteTrip = async (id: string) => {
     try {
-      await fetch(`/api/trips/${id}`, { method: "DELETE" })
+      const response = await fetch(`/api/trips/${id}`, { method: "DELETE" })
+      if (!response.ok) throw new Error("Could not delete trip")
       toast.success("Trip deleted")
       router.refresh()
     } catch {
@@ -212,7 +214,7 @@ export function DashboardClient({
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <HeroSection userName={userName} nextTrip={nextTrip} />
+      <HeroSection userName={userName} nextTrip={nextTrip} trips={allTrips} />
 
       {/* Main content */}
       <div className="max-w-7xl mx-auto px-6 py-12 space-y-16">
@@ -249,6 +251,7 @@ export function DashboardClient({
                   startDate={trip.startDate}
                   endDate={trip.endDate}
                   totalBudget={trip.totalBudget}
+                  currency={trip.currency}
                   destinations={trip.stops.map((s) => s.destination?.name ?? s.destinationId)}
                   index={i}
                   onDelete={handleDeleteTrip}
@@ -270,7 +273,7 @@ export function DashboardClient({
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {topDestinations.map((dest, i) => (
+            {topDestinations.map((dest) => (
               <DestinationCard
                 key={dest.id}
                 id={dest.id}
@@ -281,7 +284,7 @@ export function DashboardClient({
                 avgDailyCost={dest.avgDailyCost}
                 popularity={dest.popularity}
                 recommendedDays={dest.recommendedDays}
-                bestTimeToVisit={dest.bestTimeToVisit}
+                bestTimeToVisit={dest.bestTimeToVisit ?? undefined}
                 tags={dest.tags}
                 size="md"
               />
@@ -309,6 +312,7 @@ export function DashboardClient({
                   startDate={trip.startDate}
                   endDate={trip.endDate}
                   totalBudget={trip.totalBudget}
+                  currency={trip.currency}
                   destinations={trip.stops.map((s) => s.destination?.name ?? s.destinationId)}
                   index={i}
                 />

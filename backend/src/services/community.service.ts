@@ -57,6 +57,10 @@ export async function listCommunityPosts(sort: string) {
 }
 
 export async function createCommunityPost(userId: string, input: CreatePostInput) {
+  if (input.tripId) {
+    const trip = await prisma.trip.findFirst({ where: { id: input.tripId, userId, isPublic: true } })
+    if (!trip) throw new ApiError(400, "Select one of your publicly shared trips")
+  }
   return prisma.communityPost.create({
     data: {
       userId,

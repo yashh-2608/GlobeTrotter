@@ -310,10 +310,11 @@
 
   /* Hero typography */
   .hero-display {
-    font-size: clamp(3.5rem, 8vw, 9rem);
+    font-size: clamp(2.5rem, 5vw, 5rem);
     font-weight: 800;
     letter-spacing: -0.04em;
-    line-height: 0.9;
+    line-height: 1.02;
+    text-wrap: balance;
   }
 
   .section-heading {

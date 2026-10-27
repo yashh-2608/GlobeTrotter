@@ -3,8 +3,6 @@ import Credentials from "next-auth/providers/credentials"
 import type { JWT } from "next-auth/jwt"
 import { z } from "zod"
 import { backendJson } from "@/lib/backend-api"
-import { readDemoSessionFromCookieString } from "@/lib/demo-session"
-import { getServerSession } from "@/lib/server-session"
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -26,9 +24,9 @@ interface LoginResponse {
 const authSecret =
   process.env.AUTH_SECRET ??
   process.env.NEXTAUTH_SECRET ??
-  "globetrotter-development-secret"
+  (process.env.NODE_ENV === "production" ? undefined : "globetrotter-development-secret")
 
-const { handlers, auth: nextAuth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret: authSecret,
   pages: {
@@ -91,11 +89,6 @@ const { handlers, auth: nextAuth, signIn, signOut } = NextAuth({
         return true
       }
 
-      const demoSession = readDemoSessionFromCookieString(request.headers.get("cookie"))
-      if (demoSession?.user) {
-        return true
-      }
-
       return Boolean(session?.user)
     },
     async jwt({ token, user }) {
@@ -134,14 +127,3 @@ const { handlers, auth: nextAuth, signIn, signOut } = NextAuth({
     },
   },
 })
-
-export { handlers, signIn, signOut }
-
-export async function auth(): Promise<Awaited<ReturnType<typeof getServerSession>>>
-export function auth(...args: any[]): any {
-  if (args.length === 0) {
-    return getServerSession()
-  }
-
-  return (nextAuth as (...innerArgs: any[]) => any)(...args)
-}

@@ -1,10 +1,16 @@
 {
   "name": "backend",
   "private": true,
+  "engines": { "node": "24.x" },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "npm run prisma:generate && tsc -p tsconfig.json",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:compiled": "npm run build && node --test tests/compiled-runtime.test.cjs",
+    "vercel-build": "npm run prisma:generate",
+    "prisma:deploy": "prisma migrate deploy",
     "lint": "eslint src --ext .ts",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma --name init_postgres",

@@ -1,8 +1,8 @@
 "use client"
 
-import Image from "next/image"
+import { SafeImage as Image } from "@/components/travel/safe-image"
 import { motion } from "framer-motion"
-import { Clock, Star, MapPin, Plus, Tag } from "lucide-react"
+import { Clock, Star, MapPin, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 

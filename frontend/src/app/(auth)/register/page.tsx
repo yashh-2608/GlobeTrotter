@@ -72,8 +72,7 @@ export default function RegisterPage() {
         return
       }
 
-      document.cookie = "globetrotter_demo_session=; Path=/; Max-Age=0; SameSite=Lax"
-      toast.success("Account created! Signing you in...")
+      toast.success("Account created. Sign in to start planning.")
       router.push("/login")
     } catch {
       toast.error("Unable to reach the account service. Start the backend and try again.")
@@ -130,39 +129,39 @@ export default function RegisterPage() {
             {/* Row 1: Name + Username */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Full Name</label>
-                <input {...register("name")} placeholder="Yash Raj" className={inputClass(!!errors.name)} />
+                <label htmlFor="register-name" className="text-sm font-medium text-foreground">Full Name</label>
+                <input id="register-name" {...register("name")} placeholder="Yash Raj" className={inputClass(!!errors.name)} />
                 {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Username</label>
-                <input {...register("username")} placeholder="yashraj_explorer" className={inputClass(!!errors.username)} />
+                <label htmlFor="register-username" className="text-sm font-medium text-foreground">Username</label>
+                <input id="register-username" {...register("username")} placeholder="yashraj_explorer" className={inputClass(!!errors.username)} />
                 {errors.username && <p className="text-xs text-destructive">{errors.username.message}</p>}
               </div>
             </div>
 
             {/* Email */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Email Address</label>
-              <input {...register("email")} type="email" placeholder="you@example.com" autoComplete="email" className={inputClass(!!errors.email)} />
+              <label htmlFor="register-email" className="text-sm font-medium text-foreground">Email Address</label>
+              <input id="register-email" {...register("email")} type="email" placeholder="you@example.com" autoComplete="email" className={inputClass(!!errors.email)} />
               {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
             </div>
 
             {/* Row 2: Password + Confirm */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Password</label>
+                <label htmlFor="register-password" className="text-sm font-medium text-foreground">Password</label>
                 <div className="relative">
-                  <input {...register("password")} type={showPassword ? "text" : "password"} placeholder="••••••••" className={cn(inputClass(!!errors.password), "pr-12")} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <input id="register-password" {...register("password")} type={showPassword ? "text" : "password"} placeholder="••••••••" className={cn(inputClass(!!errors.password), "pr-12")} />
+                  <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Confirm Password</label>
-                <input {...register("confirmPassword")} type="password" placeholder="••••••••" className={inputClass(!!errors.confirmPassword)} />
+                <label htmlFor="register-confirmPassword" className="text-sm font-medium text-foreground">Confirm Password</label>
+                <input id="register-confirmPassword" {...register("confirmPassword")} type="password" placeholder="••••••••" className={inputClass(!!errors.confirmPassword)} />
                 {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
               </div>
             </div>

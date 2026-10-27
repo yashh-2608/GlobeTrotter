@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { Plus, Search, Filter, Map } from "lucide-react"
+import { Plus, Search, Map } from "lucide-react"
 import { TripCard } from "@/components/travel/trip-card"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -156,6 +156,7 @@ export function TripsClient({
               startDate={trip.startDate}
               endDate={trip.endDate}
               totalBudget={trip.totalBudget}
+                  currency={trip.currency}
               destinations={trip.stops.map((s) => s.destination?.name ?? s.destinationId)}
               index={i}
               onDelete={handleDelete}

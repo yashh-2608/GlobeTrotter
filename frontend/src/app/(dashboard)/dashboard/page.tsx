@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { auth } from "@/auth"
 import { backendJson } from "@/lib/backend-api"
-import type { Trip, UserProfile } from "@/types/travel"
+import type { Trip, UserProfile, Destination } from "@/types/travel"
 import { DashboardClient } from "./dashboard-client"
 
 export default async function DashboardPage() {
@@ -10,13 +10,14 @@ export default async function DashboardPage() {
     redirect("/login")
   }
 
-  const [trips, user] = await Promise.all([
+  const [trips, user, destinations] = await Promise.all([
     backendJson<Trip[]>("/trips", {
       token: session.accessToken,
-    }).catch(() => []),
+    }),
     backendJson<UserProfile>("/users/me", {
       token: session.accessToken,
-    }).catch(() => null),
+    }),
+    backendJson<Destination[]>("/destinations"),
   ])
 
   const upcoming = trips.filter((t) => t.status === "UPCOMING")
@@ -29,6 +30,7 @@ export default async function DashboardPage() {
       upcomingTrips={upcoming}
       ongoingTrips={ongoing}
       completedTrips={completed}
+      destinations={destinations}
     />
   )
 }

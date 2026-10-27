@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
+import { SafeImage as Image } from "@/components/travel/safe-image"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft, Edit3, Share2, Calendar, MapPin, Wallet,
@@ -52,7 +52,8 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
     try {
       const res = await fetch(`/api/trips/${trip.id}/share`, { method: "POST" })
       const data = await res.json()
-      setShareUrl(data.shareUrl)
+      if (!res.ok) throw new Error(data.error ?? "Failed to generate share link")
+      setShareUrl(`${window.location.origin}/shared/${encodeURIComponent(data.shareSlug)}`)
       toast.success("Trip is now public!")
     } catch {
       toast.error("Failed to generate share link")
@@ -61,9 +62,9 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
     }
   }
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (shareUrl) {
-      navigator.clipboard.writeText(shareUrl)
+      try { await navigator.clipboard.writeText(shareUrl) } catch { toast.error("Could not copy the link"); return }
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
       toast.success("Link copied!")
@@ -75,11 +76,11 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
 
   // Budget data for chart
   const budgetData = {
-    transport: 0,
-    accommodation: trip.stops.reduce((a, s) => a + s.estimatedCost, 0),
-    food: 0,
-    activities: trip.stops.reduce((a, s) => a + s.activities.reduce((b, act) => b + (act.category !== "Transport" ? act.estimatedCost : 0), 0), 0),
-    other: 0,
+    transport: trip.stops.flatMap((stop) => stop.activities).filter((activity) => activity.category?.toLowerCase() === "transport").reduce((sum, activity) => sum + activity.estimatedCost, 0),
+    accommodation: trip.stops.flatMap((stop) => stop.activities).filter((activity) => activity.category?.toLowerCase() === "accommodation").reduce((sum, activity) => sum + activity.estimatedCost, 0),
+    food: trip.stops.flatMap((stop) => stop.activities).filter((activity) => activity.category?.toLowerCase() === "food").reduce((sum, activity) => sum + activity.estimatedCost, 0),
+    activities: trip.stops.flatMap((stop) => stop.activities).filter((activity) => !["transport", "food", "accommodation", "other"].includes(activity.category?.toLowerCase() ?? "")).reduce((sum, activity) => sum + activity.estimatedCost, 0),
+    other: trip.stops.reduce((sum, stop) => sum + stop.estimatedCost, 0) + trip.stops.flatMap((stop) => stop.activities).filter((activity) => activity.category?.toLowerCase() === "other").reduce((sum, activity) => sum + activity.estimatedCost, 0),
   }
 
   return (
@@ -137,7 +138,7 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
             </div>
             <div className="flex items-center gap-1.5">
               <Wallet className="w-4 h-4 text-[#6EE7B7]" />
-              <span className="text-sm text-[#6EE7B7] font-semibold">{formatCurrency(estimatedTotal)}</span>
+              <span className="text-sm text-[#6EE7B7] font-semibold">{formatCurrency(estimatedTotal, trip.currency)}</span>
             </div>
           </div>
         </div>
@@ -194,6 +195,7 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
               <div className="lg:col-span-2">
                 <h2 className="text-lg font-bold text-foreground mb-4">Journey Route</h2>
                 <TripTimeline
+                  currency={trip.currency}
                   stops={trip.stops.map((s) => ({
                     id: s.id,
                     destinationId: s.destinationId,
@@ -205,7 +207,7 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
                     order: s.order,
                   }))}
                   interactive
-                  onStopClick={(id) => setActiveTab("itinerary")}
+                  onStopClick={() => setActiveTab("itinerary")}
                 />
               </div>
               <div className="space-y-4">
@@ -218,8 +220,8 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
                 <div className="glass-card p-5 space-y-3">
                   <h3 className="text-sm font-semibold text-foreground">Quick Stats</h3>
                   {[
-                    { label: "Total Budget", value: formatCurrency(trip.totalBudget), icon: Wallet, color: "text-primary" },
-                    { label: "Estimated Cost", value: formatCurrency(estimatedTotal), icon: BarChart2, color: "text-[#6EE7B7]" },
+                    { label: "Total Budget", value: formatCurrency(trip.totalBudget, trip.currency), icon: Wallet, color: "text-primary" },
+                    { label: "Estimated Cost", value: formatCurrency(estimatedTotal, trip.currency), icon: BarChart2, color: "text-[#6EE7B7]" },
                     { label: "Total Days", value: `${totalDays} days`, icon: Clock, color: "text-[#FBBF77]" },
                     { label: "Destinations", value: `${totalStops} cities`, icon: MapPin, color: "text-[#8BE7FF]" },
                   ].map(({ label, value, icon: Icon, color }) => (
@@ -261,6 +263,7 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
               ) : (
                 trip.stops.map((stop, i) => (
                   <ItineraryDay
+                    currency={trip.currency}
                     key={stop.id}
                     dayNumber={i + 1}
                     date={stop.startDate ? formatDate(stop.startDate) : undefined}
@@ -284,6 +287,7 @@ export function TripDetailClient({ trip }: { trip: Trip }) {
                 data={budgetData}
                 totalBudget={trip.totalBudget}
                 spent={estimatedTotal}
+                currency={trip.currency}
               />
             </motion.div>
           )}

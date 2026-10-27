@@ -1,4 +1,11 @@
 import { prisma } from "../config/prisma.js"
+import { ApiError } from "../utils/api-error.js"
+
+export async function getDestination(id: string) {
+  const destination = await prisma.destination.findUnique({ where: { id }, include: { activities: true } })
+  if (!destination) throw new ApiError(404, "Destination not found")
+  return destination
+}
 
 interface DestinationFilters {
   q?: string
@@ -26,6 +33,7 @@ export async function listDestinations(filters: DestinationFilters) {
                 { name: { contains: filters.q, mode: "insensitive" } },
                 { country: { contains: filters.q, mode: "insensitive" } },
                 { region: { contains: filters.q, mode: "insensitive" } },
+                { tags: { has: filters.q } },
               ],
             }
           : {},

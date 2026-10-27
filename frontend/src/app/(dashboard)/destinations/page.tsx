@@ -5,6 +5,7 @@ import { Search, SlidersHorizontal, Loader2 } from "lucide-react"
 import { DestinationCard } from "@/components/travel/destination-card"
 import { cn } from "@/lib/utils"
 import type { Destination } from "@/types/travel"
+import { readApiResponse } from "@/lib/api-response"
 
 export default function DestinationsPage() {
   const [query, setQuery] = useState("")
@@ -12,12 +13,13 @@ export default function DestinationsPage() {
   const [destinations, setDestinations] = useState<Destination[]>([])
   const [regions, setRegions] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
 
   useEffect(() => {
     let cancelled = false
 
     fetch("/api/destinations")
-      .then((res) => res.json())
+      .then(readApiResponse<Destination[]>)
       .then((data: Destination[]) => {
         if (cancelled) return
         setRegions(["All", ...Array.from(new Set(data.map((item) => item.region)))])
@@ -38,13 +40,14 @@ export default function DestinationsPage() {
 
     const timeout = setTimeout(() => {
       setIsLoading(true)
+      setLoadError("")
       fetch(`/api/destinations${params.toString() ? `?${params}` : ""}`, { signal: controller.signal })
-        .then((res) => res.json())
+        .then(readApiResponse<Destination[]>)
         .then((data: Destination[]) => setDestinations(data))
         .catch((error) => {
-          if (error.name !== "AbortError") setDestinations([])
+          if (error.name !== "AbortError") { setLoadError(error.message); setDestinations([]) }
         })
-        .finally(() => setIsLoading(false))
+        .finally(() => { if (!controller.signal.aborted) setIsLoading(false) })
     }, 250)
 
     return () => {
@@ -121,7 +124,8 @@ export default function DestinationsPage() {
         </div>
       )}
 
-      {!isLoading && destinations.length === 0 && (
+      {loadError && <p role="alert" className="text-destructive">{loadError}. Change a filter to retry.</p>}
+      {!isLoading && !loadError && destinations.length === 0 && (
         <div className="py-20 text-center text-muted-foreground glass-card">
           No destinations match your search. Try another region or a broader keyword.
         </div>

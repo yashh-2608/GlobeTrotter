@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -8,12 +8,10 @@ import { signIn } from "next-auth/react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { Eye, EyeOff, Globe, ArrowRight, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { clearDemoSessionCookie } from "@/lib/demo-session"
-import { isBackendHealthy } from "@/lib/backend-api"
 
 const LoginSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -30,10 +28,11 @@ const heroImages = [
 
 const HERO_IMAGE = heroImages[0]
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
+  const requestedUrl = searchParams.get("callbackUrl")
+  const callbackUrl = requestedUrl?.startsWith("/") && !requestedUrl.startsWith("//") ? requestedUrl : "/dashboard"
   const sessionExpired = searchParams.get("sessionExpired") === "1"
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -51,14 +50,6 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true)
     try {
-      clearDemoSessionCookie()
-      const backendOnline = await isBackendHealthy()
-
-      if (!backendOnline) {
-        toast.error("GlobeTrotter could not reach the trip service. Start the backend and try again.")
-        return
-      }
-
       const result = await signIn("credentials", {
         email: data.email,
         password: data.password,
@@ -68,12 +59,11 @@ export default function LoginPage() {
       if (result?.error) {
         toast.error("Invalid email or password. Please try again.")
       } else {
-        document.cookie = "globetrotter_demo_session=; Path=/; Max-Age=0; SameSite=Lax"
         toast.success("Welcome back! Preparing your journey...")
         router.push(callbackUrl)
         router.refresh()
       }
-    } catch (error) {
+    } catch {
       toast.error("Unable to sign in right now. Please try again shortly.")
     } finally {
       setIsLoading(false)
@@ -168,9 +158,11 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             {/* Email */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Email address</label>
+              <label htmlFor="login-email" className="text-sm font-medium text-foreground">Email address</label>
               <input
                 {...register("email")}
+                id="login-email"
+                aria-invalid={Boolean(errors.email)}
                 type="email"
                 placeholder="you@example.com"
                 autoComplete="email"
@@ -188,14 +180,13 @@ export default function LoginPage() {
             {/* Password */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-foreground">Password</label>
-                <Link href="#" className="text-xs text-primary hover:text-[#8BE7FF] transition-colors">
-                  Forgot password?
-                </Link>
+                <label htmlFor="login-password" className="text-sm font-medium text-foreground">Password</label>
               </div>
               <div className="relative">
                 <input
                   {...register("password")}
+                  id="login-password"
+                  aria-invalid={Boolean(errors.password)}
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   autoComplete="current-password"
@@ -253,4 +244,8 @@ export default function LoginPage() {
       </div>
     </div>
   )
+}
+
+export default function LoginPage() {
+  return <Suspense fallback={<div className="min-h-screen bg-background" />}><LoginFormContent /></Suspense>
 }

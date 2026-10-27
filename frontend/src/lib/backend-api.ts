@@ -14,12 +14,12 @@ export class BackendError extends Error {
 }
 
 export function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL
+  return process.env.BACKEND_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL
 }
 
 export async function isBackendHealthy() {
   try {
-    const response = await backendRequest("/health")
+    const response = await backendRequest("/ready")
     return response.ok
   } catch {
     return false
@@ -50,6 +50,7 @@ export async function backendRequest(path: string, options: BackendRequestOption
     headers,
     body,
     cache: "no-store",
+    signal: options.signal ?? AbortSignal.timeout(15000),
   })
 }
 
@@ -71,6 +72,7 @@ export async function backendJson<T>(path: string, options: BackendRequestOption
 const NO_BODY_STATUSES = new Set([101, 103, 204, 205, 304])
 
 export async function proxyBackend(path: string, options: BackendRequestOptions = {}) {
+  try {
   const response = await backendRequest(path, options)
 
   if (NO_BODY_STATUSES.has(response.status)) {
@@ -85,4 +87,7 @@ export async function proxyBackend(path: string, options: BackendRequestOptions 
       "content-type": response.headers.get("content-type") ?? "application/json",
     },
   })
+  } catch {
+    return NextResponse.json({ error: "The trip service is temporarily unavailable. Please try again." }, { status: 503 })
+  }
 }

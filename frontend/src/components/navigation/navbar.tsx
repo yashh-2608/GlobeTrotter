@@ -5,10 +5,10 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { Globe, Bell, User, Menu, X, Map, Compass, Users, Calendar } from "lucide-react"
+import { Globe, User, Menu, X, Map, Compass, Users, Calendar } from "lucide-react"
+import type { Session } from "next-auth"
 import { cn } from "@/lib/utils"
 import { useSession } from "next-auth/react"
-import { clearDemoSessionCookie } from "@/lib/demo-session"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -26,7 +26,7 @@ const navLinks = [
   { href: "/calendar", label: "Calendar", icon: Calendar },
 ]
 
-export function Navbar({ serverSession }: { serverSession?: any }) {
+export function Navbar({ serverSession }: { serverSession?: Session | null }) {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
@@ -101,12 +101,6 @@ export function Navbar({ serverSession }: { serverSession?: any }) {
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            <button
-              className="hidden md:flex w-9 h-9 rounded-xl glass items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Notifications"
-            >
-              <Bell className="w-4 h-4" />
-            </button>
 
             {session?.user ? (
               <DropdownMenu>
@@ -135,7 +129,6 @@ export function Navbar({ serverSession }: { serverSession?: any }) {
                 <DropdownMenuItem
                   className="text-destructive cursor-pointer"
                   onClick={() => {
-                    clearDemoSessionCookie()
                     void signOut({ callbackUrl: "/login" })
                   }}
                 >
@@ -157,6 +150,7 @@ export function Navbar({ serverSession }: { serverSession?: any }) {
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden w-9 h-9 rounded-xl glass flex items-center justify-center text-muted-foreground"
               aria-label="Toggle menu"
+              aria-expanded={mobileOpen}
             >
               {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>

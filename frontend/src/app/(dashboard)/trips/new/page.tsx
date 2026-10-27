@@ -3,37 +3,15 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
 import {
   ArrowLeft, ArrowRight, Check, Globe, MapPin, Calendar,
   Wallet, Camera, Loader2, Plus, X
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import Image from "next/image"
+import { SafeImage as Image } from "@/components/travel/safe-image"
 import type { Destination } from "@/types/travel"
-
-/* ── Schema ─────────────────────────────── */
-const Step1Schema = z.object({
-  title: z.string().min(2, "Trip name must be at least 2 characters"),
-  coverImage: z.string().optional(),
-})
-
-const Step2Schema = z.object({
-  startDate: z.string().min(1, "Start date is required"),
-  endDate: z.string().min(1, "End date is required"),
-})
-
-const Step3Schema = z.object({
-  totalBudget: z.number().min(0, "Budget must be positive"),
-  currency: z.string().default("INR"),
-})
-
-type Step1Data = z.infer<typeof Step1Schema>
-type Step2Data = z.infer<typeof Step2Schema>
-type Step3Data = z.infer<typeof Step3Schema>
+import { readApiResponse } from "@/lib/api-response"
 
 /* ── Step configs ────────────────────────── */
 const STEPS = [
@@ -49,13 +27,7 @@ export default function NewTripPage() {
   const [step, setStep] = useState(1)
   const [isCreating, setIsCreating] = useState(false)
   const [destinations, setDestinations] = useState<Destination[]>([])
-
-  useEffect(() => {
-    fetch("/api/destinations")
-      .then((res) => res.json())
-      .then((data: unknown) => setDestinations(Array.isArray(data) ? data as Destination[] : []))
-      .catch(() => setDestinations([]))
-  }, [])
+  const [destinationError, setDestinationError] = useState("")
 
   const coverImages = destinations.map((d) => ({ id: d.id, url: d.image, label: d.name }))
 
@@ -73,6 +45,20 @@ export default function NewTripPage() {
 
   const selectedCoverImage = tripData.coverImage || coverImages[0]?.url || ""
 
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch("/api/destinations", { signal: controller.signal })
+      .then(readApiResponse<Destination[]>)
+      .then((data) => {
+        setDestinations(data)
+        const selectedId = new URLSearchParams(window.location.search).get("destination")
+        const destination = data.find((item) => item.id === selectedId)
+        if (destination) setTripData((current) => ({ ...current, stops: current.stops.length ? current.stops : [{ destinationId: destination.id, name: destination.name, days: destination.recommendedDays, cost: destination.avgDailyCost * destination.recommendedDays }], coverImage: current.coverImage || destination.image }))
+      })
+      .catch((error) => { if (error.name !== "AbortError") setDestinationError(error.message) })
+    return () => controller.abort()
+  }, [])
+
   const inputClass = (err?: boolean) =>
     cn(
       "w-full h-11 px-4 rounded-xl glass border text-foreground placeholder-[#A7ACB8]/50 text-sm transition-all outline-none",
@@ -81,6 +67,14 @@ export default function NewTripPage() {
     )
 
   const handleCreate = async () => {
+    if (tripData.startDate && tripData.endDate && tripData.endDate < tripData.startDate) {
+      toast.error("Return date must be on or after departure")
+      return
+    }
+    if (!Number.isFinite(tripData.totalBudget) || tripData.totalBudget < 0) {
+      toast.error("Enter a valid budget")
+      return
+    }
     setIsCreating(true)
     try {
       const res = await fetch("/api/trips", {
@@ -94,6 +88,7 @@ export default function NewTripPage() {
           currency: tripData.currency,
           coverImage: selectedCoverImage || undefined,
           notes: tripData.notes,
+          stops: tripData.stops.map((stop) => ({ destinationId: stop.destinationId, daysCount: stop.days, estimatedCost: stop.cost })),
         }),
       })
 
@@ -101,20 +96,6 @@ export default function NewTripPage() {
       if (!res.ok) {
         toast.error(json.error ?? "Failed to create trip")
         return
-      }
-
-      // Add stops
-      for (const stop of tripData.stops) {
-        await fetch(`/api/trips/${json.trip.id}/stops`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            destinationId: stop.destinationId,
-            destinationName: stop.name,
-            daysCount: stop.days,
-            estimatedCost: stop.cost,
-          }),
-        })
       }
 
       toast.success("🎉 Trip created! Time to start planning.")
@@ -175,7 +156,8 @@ export default function NewTripPage() {
       </div>
 
       {/* Step content */}
-      <div className="glass-card p-8">
+      {destinationError && <p role="alert" className="mb-4 text-sm text-destructive">{destinationError}. Refresh to try loading destinations again.</p>}
+      <div className="glass-card p-4 sm:p-8">
         <AnimatePresence mode="wait">
           {/* Step 1 — Name */}
           {step === 1 && (
@@ -280,7 +262,7 @@ export default function NewTripPage() {
                     ))}
                   </div>
                   {destinations.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-6">Loading destinations...</p>
+                    <p className="text-xs text-muted-foreground text-center py-6">{destinationError ? "Destinations could not be loaded" : "Loading destinations..."}</p>
                   )}
                 </div>
               )}
@@ -437,6 +419,10 @@ export default function NewTripPage() {
             onClick={() => {
               if (step === 1 && !tripData.title.trim()) {
                 toast.error("Please give your trip a name")
+                return
+              }
+              if (step === 3 && tripData.startDate && tripData.endDate && tripData.endDate < tripData.startDate) {
+                toast.error("Return date must be on or after departure")
                 return
               }
               setStep(s => s + 1)

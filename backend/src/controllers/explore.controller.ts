@@ -1,5 +1,10 @@
 import type { Request, Response } from "express"
-import { listActivities, listDestinations } from "../services/explore.service.js"
+import { getDestination, listActivities, listDestinations } from "../services/explore.service.js"
+import { routeParam } from "../utils/route-param.js"
+
+export async function getDestinationController(req: Request, res: Response) {
+  res.json(await getDestination(routeParam(req.params.id)))
+}
 
 export async function listDestinationsController(req: Request, res: Response) {
   const destinations = await listDestinations({

@@ -1,6 +1,7 @@
 import type { Response } from "express"
 import { z } from "zod"
 import type { AuthenticatedRequest } from "../types/auth.js"
+import { dateInput, moneyInput, stopSchema, tripSchema } from "../utils/trip-validation.js"
 import {
   addStop,
   addTripActivity,
@@ -16,51 +17,29 @@ import {
   listTrips,
   updateStop,
   updateTrip,
+  reorderStops,
+  autoPlanTrip,
 } from "../services/trips.service.js"
 
-const tripSchema = z.object({
-  title: z.string().min(1),
-  status: z.enum(["UPCOMING", "ONGOING", "COMPLETED"]).optional(),
-  coverImage: z.string().url().optional(),
-  startDate: z.string().nullable().optional(),
-  endDate: z.string().nullable().optional(),
-  totalBudget: z.number().nonnegative().optional(),
-  currency: z.string().optional(),
-  notes: z.string().optional(),
-})
-
-const stopSchema = z.object({
-  destinationId: z.string().optional(),
-  destinationName: z.string().optional(),
-  country: z.string().optional(),
-  region: z.string().optional(),
-  image: z.string().url().optional(),
-  description: z.string().optional(),
-  startDate: z.string().nullable().optional(),
-  endDate: z.string().nullable().optional(),
-  daysCount: z.number().int().positive().optional(),
-  estimatedCost: z.number().nonnegative().optional(),
-  notes: z.string().optional(),
-})
+const createTripSchema = tripSchema.extend({ stops: z.array(stopSchema).max(20).optional() })
 
 const updateStopSchema = z.object({
-  startDate: z.string().nullable().optional(),
-  endDate: z.string().nullable().optional(),
-  daysCount: z.number().int().positive().optional(),
-  estimatedCost: z.number().nonnegative().optional(),
+  startDate: dateInput,
+  endDate: dateInput,
+  daysCount: z.number().int().min(1).max(365).optional(),
+  estimatedCost: moneyInput.optional(),
   notes: z.string().optional(),
-  order: z.number().int().nonnegative().optional(),
 })
 
 const tripActivitySchema = z.object({
   tripStopId: z.string(),
   activityId: z.string().optional(),
   title: z.string().min(1),
-  scheduledDate: z.string().nullable().optional(),
-  scheduledTime: z.string().nullable().optional(),
+  scheduledDate: dateInput,
+  scheduledTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
   duration: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  estimatedCost: z.number().nonnegative().optional(),
+  estimatedCost: moneyInput.optional(),
   category: z.string().nullable().optional(),
 })
 
@@ -70,7 +49,7 @@ export async function listTripsController(req: AuthenticatedRequest, res: Respon
 }
 
 export async function createTripController(req: AuthenticatedRequest, res: Response) {
-  const input = tripSchema.parse(req.body)
+  const input = createTripSchema.parse(req.body)
   const trip = await createTrip(req.user!.id, input)
   res.status(201).json({ trip })
 }
@@ -137,4 +116,15 @@ export async function sharedTripController(req: AuthenticatedRequest, res: Respo
 export async function copySharedTripController(req: AuthenticatedRequest, res: Response) {
   const trip = await copySharedTrip(req.user!.id, req.params.slug)
   res.status(201).json({ trip })
+}
+
+export async function reorderStopsController(req: AuthenticatedRequest, res: Response) {
+  const { stopIds } = z.object({ stopIds: z.array(z.string().min(1)).max(100) }).parse(req.body)
+  await reorderStops(req.user!.id, req.params.id, stopIds)
+  res.json({ saved: true })
+}
+
+export async function autoPlanController(req: AuthenticatedRequest, res: Response) {
+  const trip = await autoPlanTrip(req.user!.id, req.params.id)
+  res.json({ trip })
 }

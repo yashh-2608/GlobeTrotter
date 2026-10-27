@@ -14,6 +14,8 @@ import {
   sharedTripController,
   updateStopController,
   updateTripController,
+  reorderStopsController,
+  autoPlanController,
 } from "../controllers/trips.controller.js"
 import { requireAuth } from "../middleware/auth.middleware.js"
 import { asyncHandler } from "../utils/async-handler.js"
@@ -30,6 +32,8 @@ tripsRouter.get("/:id", asyncHandler(getTripController))
 tripsRouter.patch("/:id", asyncHandler(updateTripController))
 tripsRouter.delete("/:id", asyncHandler(deleteTripController))
 tripsRouter.post("/:id/stops", asyncHandler(addStopController))
+tripsRouter.put("/:id/stops/order", asyncHandler(reorderStopsController))
+tripsRouter.post("/:id/auto-plan", asyncHandler(autoPlanController))
 tripsRouter.get("/:id/budget", asyncHandler(getBudgetController))
 tripsRouter.post("/:id/share", asyncHandler(shareTripController))
 tripsRouter.post("/:id/activities", asyncHandler(addTripActivityController))

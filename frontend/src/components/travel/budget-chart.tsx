@@ -37,19 +37,19 @@ const BUDGET_COLORS = {
   other: "#A7ACB8",
 }
 
-const CustomTooltip = ({ active, payload }: TooltipPayload) => {
+const CustomTooltip = ({ active, payload, currency = "INR" }: TooltipPayload & { currency?: string }) => {
   if (active && payload && payload.length) {
     return (
       <div className="glass-stronger rounded-xl px-3 py-2 text-sm">
         <p className="font-medium text-foreground">{payload[0].name}</p>
-        <p className="text-[#6EE7B7] font-semibold">{formatCurrency(payload[0].value)}</p>
+        <p className="text-[#6EE7B7] font-semibold">{formatCurrency(payload[0].value, currency)}</p>
       </div>
     )
   }
   return null
 }
 
-export function BudgetChart({ data, totalBudget, spent, className }: BudgetChartProps) {
+export function BudgetChart({ data, totalBudget, spent, currency = "INR", className }: BudgetChartProps) {
   const pieData = [
     { name: "Transport", value: data.transport, color: BUDGET_COLORS.transport },
     { name: "Stay", value: data.accommodation, color: BUDGET_COLORS.accommodation },
@@ -77,8 +77,8 @@ export function BudgetChart({ data, totalBudget, spent, className }: BudgetChart
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Total Estimated</p>
-            <p className="text-3xl font-bold text-foreground mt-1">{formatCurrency(spent)}</p>
-            <p className="text-sm text-muted-foreground mt-0.5">of {formatCurrency(totalBudget)} budget</p>
+            <p className="text-3xl font-bold text-foreground mt-1">{formatCurrency(spent, currency)}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">of {formatCurrency(totalBudget, currency)} budget</p>
           </div>
           {isOverBudget ? (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FB7185]/10 border border-[#FB7185]/20">
@@ -111,7 +111,7 @@ export function BudgetChart({ data, totalBudget, spent, className }: BudgetChart
         <div className="flex justify-between mt-2">
           <span className="text-xs text-muted-foreground">{percentUsed.toFixed(1)}% used</span>
           <span className={cn("text-xs font-semibold", isOverBudget ? "text-destructive" : "text-[#6EE7B7]")}>
-            {isOverBudget ? `₹${Math.abs(remaining).toLocaleString()} over` : `₹${remaining.toLocaleString()} left`}
+            {formatCurrency(Math.abs(remaining), currency)} {isOverBudget ? "over" : "left"}
           </span>
         </div>
 
@@ -139,7 +139,7 @@ export function BudgetChart({ data, totalBudget, spent, className }: BudgetChart
                       <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
                     ))}
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<CustomTooltip currency={currency} />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex-1 space-y-2">
@@ -149,7 +149,7 @@ export function BudgetChart({ data, totalBudget, spent, className }: BudgetChart
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
                       <span className="text-xs text-muted-foreground">{item.name}</span>
                     </div>
-                    <span className="text-xs font-semibold text-foreground">{formatCurrency(item.value)}</span>
+                    <span className="text-xs font-semibold text-foreground">{formatCurrency(item.value, currency)}</span>
                   </div>
                 ))}
               </div>
@@ -166,7 +166,7 @@ export function BudgetChart({ data, totalBudget, spent, className }: BudgetChart
             <BarChart data={barData} barSize={16}>
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#A7ACB8" }} axisLine={false} tickLine={false} />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+              <Tooltip content={<CustomTooltip currency={currency} />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
               <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                 {barData.map((entry, index) => {
                   const colors = Object.values(BUDGET_COLORS)

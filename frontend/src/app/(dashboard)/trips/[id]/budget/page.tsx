@@ -44,7 +44,8 @@ export default async function TripBudgetPage({ params }: { params: Promise<{ id:
         </p>
       </div>
 
-      <BudgetChart data={budget.breakdown} totalBudget={budget.totalBudget} spent={budget.spent} currency={budget.currency} />
+      <p className="mb-5 text-sm text-muted-foreground">Actual expenses: {new Intl.NumberFormat("en-IN", { style: "currency", currency: budget.currency }).format(budget.spent)}</p>
+      <BudgetChart data={budget.breakdown} totalBudget={budget.totalBudget} spent={budget.estimated} currency={budget.currency} />
     </div>
   )
 }

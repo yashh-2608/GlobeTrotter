@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { FormEvent } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -23,6 +23,7 @@ interface BuilderClientProps {
   tripId: string
   tripTitle: string
   stops: Stop[]
+  currency?: string
 }
 
 function stopActivitiesCost(stop: Stop) {
@@ -100,7 +101,7 @@ function SortableStop({
   )
 }
 
-export function BuilderClient({ tripId, tripTitle, stops: initialStops }: BuilderClientProps) {
+export function BuilderClient({ tripId, tripTitle, stops: initialStops, currency = "INR" }: BuilderClientProps) {
   const router = useRouter()
   const [stops, setStops] = useState(initialStops)
   const [selectedStopId, setSelectedStopId] = useState<string | null>(initialStops[0]?.id ?? null)
@@ -109,6 +110,8 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
   const [isLoadingActivities, setIsLoadingActivities] = useState(false)
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const reorderPending = useRef(false)
+  const [isReordering, setIsReordering] = useState(false)
 
   const [isPickingDestination, setIsPickingDestination] = useState(false)
   const [allDestinations, setAllDestinations] = useState<Destination[]>([])
@@ -122,13 +125,14 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
   const selectedStop = stops.find((s) => s.id === selectedStopId) ?? null
 
   useEffect(() => {
-    setStopDraft({
+    const frame = requestAnimationFrame(() => setStopDraft({
       startDate: selectedStop?.startDate ? new Date(selectedStop.startDate).toISOString().slice(0, 10) : "",
       endDate: selectedStop?.endDate ? new Date(selectedStop.endDate).toISOString().slice(0, 10) : "",
       daysCount: String(selectedStop?.daysCount ?? 1),
       estimatedCost: String(selectedStop?.estimatedCost ?? 0),
       notes: selectedStop?.notes ?? "",
-    })
+    }))
+    return () => cancelAnimationFrame(frame)
   }, [selectedStopId, selectedStop?.startDate, selectedStop?.endDate, selectedStop?.daysCount, selectedStop?.estimatedCost, selectedStop?.notes])
 
   const sensors = useSensors(
@@ -171,16 +175,27 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
       .catch(() => setAllDestinations([]))
   }, [isPickingDestination, allDestinations.length])
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
-    if (over && active.id !== over.id) {
-      setStops((items) => {
-        const oldIndex = items.findIndex((i) => i.id === active.id)
-        const newIndex = items.findIndex((i) => i.id === over.id)
-        return arrayMove(items, oldIndex, newIndex)
-      })
+    if (!over || active.id === over.id || reorderPending.current) return
+    const previous = stops
+    const reordered = arrayMove(stops, stops.findIndex((stop) => stop.id === active.id), stops.findIndex((stop) => stop.id === over.id))
+    reorderPending.current = true
+    setIsReordering(true)
+    setStops(reordered)
+    try {
+      const response = await fetch(`/api/trips/${tripId}/stops/order`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stopIds: reordered.map((stop) => stop.id) }) })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error ?? "Could not save destination order")
+      toast.success("Destination order saved")
+    } catch (error) {
+      setStops(previous)
+      toast.error(error instanceof Error ? error.message : "Could not save destination order")
+    } finally {
+      reorderPending.current = false
+      setIsReordering(false)
     }
-  }, [])
+  }
 
   const handleAddStop = async (destination: Destination) => {
     setIsAddingStop(true)
@@ -372,9 +387,17 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
 
   const handleSmartPlan = async () => {
     setIsGenerating(true)
-    await new Promise((r) => setTimeout(r, 2500))
-    toast.success("✨ Smart itinerary generated! Check your updated stops.")
-    setIsGenerating(false)
+    try {
+      const response = await fetch(`/api/trips/${tripId}/auto-plan`, { method: "POST" })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error ?? "Could not generate a plan")
+      const count = (items: Stop[]) => items.reduce((sum, stop) => sum + stop.activities.length, 0)
+      const added = count(payload.trip.stops) - count(stops)
+      setStops(payload.trip.stops)
+      toast.success(added > 0 ? `${added} activities added. Review your schedule below.` : "Existing plans kept. No new catalogue activities to add.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not generate a plan")
+    } finally { setIsGenerating(false) }
   }
 
   const filteredDestinationOptions = allDestinations.filter(
@@ -384,7 +407,7 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
   )
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col pt-24">
       {/* Top bar */}
       <div className="glass-nav px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -403,7 +426,7 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-[#7C8CFF]/20 to-[#8BE7FF]/20 border border-[#7C8CFF]/30 text-primary text-xs font-semibold hover:from-[#7C8CFF]/30 transition-all disabled:opacity-50"
           >
             {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-            Smart Plan
+            Auto plan
           </button>
           <button
             onClick={() => router.push(`/trips/${tripId}`)}
@@ -415,9 +438,9 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
       </div>
 
       {/* Main panel: 3-column */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col lg:flex-row min-w-0">
         {/* Left: Stops (sortable) */}
-        <div className="w-64 border-r border-border flex flex-col overflow-hidden flex-shrink-0">
+        <div className={cn("w-full lg:w-64 border-b lg:border-r border-border flex flex-col lg:max-h-[75vh] flex-shrink-0", isReordering && "pointer-events-none opacity-60")}>
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Stops</h2>
@@ -487,7 +510,7 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
         </div>
 
         {/* Middle: Day view */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 min-w-0 p-4 sm:p-6">
           {selectedStop ? (
             <div>
               <section className="mb-6 rounded-2xl glass-card p-4">
@@ -549,7 +572,7 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
                   {selectedStop.destination?.name ?? selectedStop.destinationId} — Activities
                 </h2>
                 <span className="text-sm font-semibold text-[#6EE7B7]">
-                  {formatCurrency(stopActivitiesCost(selectedStop))}
+                  {formatCurrency(stopActivitiesCost(selectedStop), currency)}
                 </span>
               </div>
               {selectedStop.activities.length === 0 ? (
@@ -570,11 +593,11 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
                         {act.notes && <p className="text-xs text-muted-foreground/80">{act.notes}</p>}
                       </div>
                       <span className="text-xs font-semibold text-[#6EE7B7] flex-shrink-0">
-                        {formatCurrency(act.estimatedCost)}
+                        {formatCurrency(act.estimatedCost, currency)}
                       </span>
                       <button
                         onClick={() => handleRemoveActivity(selectedStop.id, act.id)}
-                        className="flex-shrink-0 w-6 h-6 rounded-lg bg-[#FB7185]/10 hover:bg-[#FB7185]/20 flex items-center justify-center text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#FB7185]/10 hover:bg-[#FB7185]/20 flex items-center justify-center text-destructive"
                         aria-label={`Remove ${act.title ?? act.name}`}
                       >
                         <Trash2 className="w-3 h-3" />
@@ -592,7 +615,7 @@ export function BuilderClient({ tripId, tripTitle, stops: initialStops }: Builde
         </div>
 
         {/* Right: Activity picker */}
-        <div className="w-72 border-l border-border flex flex-col overflow-hidden flex-shrink-0">
+        <div className="w-full lg:w-72 border-t lg:border-l border-border flex flex-col flex-shrink-0 lg:max-h-[75vh]">
           <div className="p-4 border-b border-border">
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Add Activities</h2>
             <div className="relative">

@@ -5,6 +5,7 @@ import { Search, Filter, Loader2 } from "lucide-react"
 import { ActivityCard } from "@/components/travel/activity-card"
 import { cn } from "@/lib/utils"
 import type { Activity, Destination } from "@/types/travel"
+import { readApiResponse } from "@/lib/api-response"
 
 interface ActivityResult extends Activity {
   destination?: Destination
@@ -18,12 +19,13 @@ export default function ActivitiesPage() {
   const [categories, setCategories] = useState<string[]>([])
   const [destinations, setDestinations] = useState<{ id: string; name: string }[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
 
   useEffect(() => {
     let cancelled = false
 
     fetch("/api/activities")
-      .then((res) => res.json())
+      .then(readApiResponse<ActivityResult[]>)
       .then((data: unknown) => {
         if (cancelled) return
         const arr = Array.isArray(data) ? data as ActivityResult[] : []
@@ -51,13 +53,14 @@ export default function ActivitiesPage() {
 
     const timeout = setTimeout(() => {
       setIsLoading(true)
+      setLoadError("")
       fetch(`/api/activities${params.toString() ? `?${params}` : ""}`, { signal: controller.signal })
-        .then((res) => res.json())
+        .then(readApiResponse<ActivityResult[]>)
         .then((data: unknown) => setResults(Array.isArray(data) ? data as ActivityResult[] : []))
         .catch((error) => {
-          if (error.name !== "AbortError") setResults([])
+          if (error.name !== "AbortError") { setLoadError(error.message); setResults([]) }
         })
-        .finally(() => setIsLoading(false))
+        .finally(() => { if (!controller.signal.aborted) setIsLoading(false) })
     }, 250)
 
     return () => {
@@ -162,7 +165,8 @@ export default function ActivitiesPage() {
         </div>
       )}
 
-      {!isLoading && results.length === 0 && (
+      {loadError && <p role="alert" className="text-destructive">{loadError}. Change a filter to retry.</p>}
+      {!isLoading && !loadError && results.length === 0 && (
         <div className="py-20 text-center text-muted-foreground glass-card">
           No activities match your filters. Try broadening the search.
         </div>

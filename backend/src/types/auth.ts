@@ -7,6 +7,6 @@ export interface AuthUser {
   role: UserRole
 }
 
-export interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Request<Record<string, string>> {
   user?: AuthUser
 }

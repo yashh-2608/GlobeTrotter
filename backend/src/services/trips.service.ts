@@ -1,17 +1,19 @@
-import { ExpenseCategory } from "../../generated/prisma/client"
+import { Prisma } from "../../generated/prisma/client"
 import { prisma } from "../config/prisma.js"
 import { env } from "../config/env.js"
 import { ApiError } from "../utils/api-error.js"
+import { parseDate, validateDates, validateWindow } from "../utils/trip-validation.js"
 
 interface CreateTripInput {
   title: string
   status?: "UPCOMING" | "ONGOING" | "COMPLETED"
-  coverImage?: string
+  coverImage?: string | null
   startDate?: string | null
   endDate?: string | null
   totalBudget?: number
   currency?: string
   notes?: string
+  stops?: CreateStopInput[]
 }
 
 interface CreateStopInput {
@@ -59,53 +61,19 @@ function generateShareSlug(title: string) {
   return `${safeTitle}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function parseDate(value?: string | null) {
-  return value ? new Date(value) : undefined
+async function ensureDestination(input: CreateStopInput, db: Prisma.TransactionClient = prisma) {
+  const destination = input.destinationId
+    ? await db.destination.findUnique({ where: { id: input.destinationId } })
+    : null
+  if (!destination) throw new ApiError(400, "Select an existing destination")
+  return destination.id
 }
 
-async function ensureDestination(input: CreateStopInput) {
-  if (input.destinationId) {
-    const existing = await prisma.destination.findUnique({
-      where: { id: input.destinationId },
-    })
-
-    if (existing) {
-      return existing.id
-    }
-  }
-
-  const name = input.destinationName ?? input.destinationId ?? "Untitled Destination"
-  const country = input.country ?? "TBD"
-
-  const existingByName = await prisma.destination.findFirst({
-    where: {
-      name,
-      country,
-    },
-  })
-
-  if (existingByName) {
-    return existingByName.id
-  }
-
-  const created = await prisma.destination.create({
-    data: {
-      name,
-      country,
-      region: input.region ?? "Global",
-      image:
-        input.image ??
-        "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1200&auto=format&fit=crop",
-      description: input.description ?? `${name} is ready to be explored.`,
-      avgDailyCost: input.estimatedCost ?? 0,
-      popularity: 80,
-      bestTimeToVisit: "Year round",
-      recommendedDays: input.daysCount ?? 3,
-      tags: [],
-    },
-  })
-
-  return created.id
+async function lockTrip(tx: Prisma.TransactionClient, userId: string, tripId: string) {
+  await tx.$queryRaw`SELECT "id" FROM "Trip" WHERE "id" = ${tripId} AND "userId" = ${userId} FOR UPDATE`
+  const trip = await tx.trip.findFirst({ where: { id: tripId, userId } })
+  if (!trip) throw new ApiError(404, "Trip not found")
+  return trip
 }
 
 export async function listTrips(userId: string) {
@@ -169,7 +137,17 @@ export async function getTrip(userId: string, tripId: string) {
 }
 
 export async function createTrip(userId: string, input: CreateTripInput) {
-  return prisma.trip.create({
+  validateDates(input.startDate, input.endDate)
+  const stops = input.stops ?? []
+  return prisma.$transaction(async (tx) => {
+    const stopData = []
+    for (const [order, stop] of stops.entries()) {
+      validateWindow(stop.startDate, stop.endDate, input.startDate, input.endDate)
+      stopData.push({ destinationId: await ensureDestination(stop, tx), order,
+        daysCount: stop.daysCount ?? 1, estimatedCost: stop.estimatedCost ?? 0,
+        startDate: parseDate(stop.startDate), endDate: parseDate(stop.endDate), notes: stop.notes })
+    }
+    return tx.trip.create({
     data: {
       userId,
       title: input.title,
@@ -181,12 +159,19 @@ export async function createTrip(userId: string, input: CreateTripInput) {
       currency: input.currency ?? "INR",
       shareSlug: generateShareSlug(input.title),
       notes: input.notes,
+      stops: { create: stopData },
     },
+    include: { stops: { orderBy: { order: "asc" }, include: { destination: true, activities: true } } },
+    })
   })
 }
 
 export async function updateTrip(userId: string, tripId: string, input: Partial<CreateTripInput>) {
-  await getTrip(userId, tripId)
+  const existing = await getTrip(userId, tripId)
+  const start = input.startDate === undefined ? existing.startDate : input.startDate
+  const end = input.endDate === undefined ? existing.endDate : input.endDate
+  validateDates(start, end)
+  for (const stop of existing.stops) validateWindow(stop.startDate, stop.endDate, start, end)
 
   return prisma.trip.update({
     where: { id: tripId },
@@ -211,16 +196,16 @@ export async function deleteTrip(userId: string, tripId: string) {
 }
 
 export async function addStop(userId: string, tripId: string, input: CreateStopInput) {
-  await getTrip(userId, tripId)
-
-  const destinationId = await ensureDestination(input)
-
-  const lastStop = await prisma.tripStop.findFirst({
+  return prisma.$transaction(async (tx) => {
+  const trip = await lockTrip(tx, userId, tripId)
+  validateWindow(input.startDate, input.endDate, trip.startDate, trip.endDate)
+  const destinationId = await ensureDestination(input, tx)
+  const lastStop = await tx.tripStop.findFirst({
     where: { tripId },
     orderBy: { order: "desc" },
   })
 
-  return prisma.tripStop.create({
+  return tx.tripStop.create({
     data: {
       tripId,
       destinationId,
@@ -236,6 +221,7 @@ export async function addStop(userId: string, tripId: string, input: CreateStopI
       activities: true,
     },
   })
+  })
 }
 
 export async function updateStop(userId: string, stopId: string, input: UpdateStopInput) {
@@ -250,6 +236,9 @@ export async function updateStop(userId: string, stopId: string, input: UpdateSt
     throw new ApiError(404, "Stop not found")
   }
 
+  validateWindow(input.startDate === undefined ? stop.startDate : input.startDate,
+    input.endDate === undefined ? stop.endDate : input.endDate, stop.trip.startDate, stop.trip.endDate)
+
   return prisma.tripStop.update({
     where: { id: stopId },
     data: {
@@ -258,7 +247,6 @@ export async function updateStop(userId: string, stopId: string, input: UpdateSt
       daysCount: input.daysCount,
       estimatedCost: input.estimatedCost,
       notes: input.notes,
-      order: input.order,
     },
     include: {
       destination: true,
@@ -293,6 +281,12 @@ export async function addTripActivity(userId: string, tripId: string, input: Cre
 
   if (!stop || stop.tripId !== tripId) {
     throw new ApiError(404, "Trip stop not found")
+  }
+
+  validateWindow(input.scheduledDate, input.scheduledDate, stop.startDate, stop.endDate)
+  if (input.activityId) {
+    const activity = await prisma.activity.findFirst({ where: { id: input.activityId, destinationId: stop.destinationId } })
+    if (!activity) throw new ApiError(400, "Activity does not belong to this destination")
   }
 
   return prisma.tripActivity.create({
@@ -336,54 +330,70 @@ export async function deleteTripActivity(userId: string, tripActivityId: string)
 
 export async function getBudgetSummary(userId: string, tripId: string) {
   const trip = await getTrip(userId, tripId)
-
-  const transport =
-    trip.expenses
-      .filter((expense) => expense.category === ExpenseCategory.TRANSPORT)
-      .reduce((sum, expense) => sum + expense.amount, 0) +
-    trip.stops
-      .flatMap((stop) => stop.activities)
-      .filter((activity) => activity.category?.toLowerCase() === "transport")
-      .reduce((sum, activity) => sum + activity.estimatedCost, 0)
-
-  const accommodation =
-    trip.expenses
-      .filter((expense) => expense.category === ExpenseCategory.ACCOMMODATION)
-      .reduce((sum, expense) => sum + expense.amount, 0) +
-    trip.stops.reduce((sum, stop) => sum + stop.estimatedCost, 0)
-
-  const food = trip.expenses
-    .filter((expense) => expense.category === ExpenseCategory.FOOD)
-    .reduce((sum, expense) => sum + expense.amount, 0)
-
-  const activities =
-    trip.expenses
-      .filter((expense) => expense.category === ExpenseCategory.ACTIVITIES)
-      .reduce((sum, expense) => sum + expense.amount, 0) +
-    trip.stops
-      .flatMap((stop) => stop.activities)
-      .filter((activity) => activity.category?.toLowerCase() !== "transport")
-      .reduce((sum, activity) => sum + activity.estimatedCost, 0)
-
-  const other = trip.expenses
-    .filter((expense) => expense.category === ExpenseCategory.OTHER)
-    .reduce((sum, expense) => sum + expense.amount, 0)
-
-  const spent = transport + accommodation + food + activities + other
+  const breakdown = { transport: 0, accommodation: 0, food: 0, activities: 0, other: 0 }
+  const categoryKey = (category?: string | null): keyof typeof breakdown => {
+    const key = category?.toLowerCase()
+    return key && Object.hasOwn(breakdown, key) ? key as keyof typeof breakdown : "activities"
+  }
+  for (const stop of trip.stops) {
+    breakdown.other += stop.estimatedCost
+    for (const activity of stop.activities) breakdown[categoryKey(activity.category)] += activity.estimatedCost
+  }
+  const actualBreakdown = { transport: 0, accommodation: 0, food: 0, activities: 0, other: 0 }
+  for (const expense of trip.expenses) actualBreakdown[categoryKey(expense.category)] += expense.amount
+  const round = (amount: number) => Math.round((amount + Number.EPSILON) * 100) / 100
+  for (const key of Object.keys(breakdown) as Array<keyof typeof breakdown>) {
+    breakdown[key] = round(breakdown[key])
+    actualBreakdown[key] = round(actualBreakdown[key])
+  }
+  const estimated = round(Object.values(breakdown).reduce((sum, value) => sum + value, 0))
+  const spent = round(Object.values(actualBreakdown).reduce((sum, value) => sum + value, 0))
 
   return {
     totalBudget: trip.totalBudget,
     spent,
-    remaining: trip.totalBudget - spent,
-    breakdown: {
-      transport,
-      accommodation,
-      food,
-      activities,
-      other,
-    },
+    estimated,
+    remaining: round(trip.totalBudget - spent),
+    breakdown,
+    actualBreakdown,
     currency: trip.currency,
   }
+}
+
+export async function reorderStops(userId: string, tripId: string, stopIds: string[]) {
+  await prisma.$transaction(async (tx) => {
+    await lockTrip(tx, userId, tripId)
+    const stops = await tx.tripStop.findMany({ where: { tripId } })
+    if (new Set(stopIds).size !== stopIds.length || stops.length !== stopIds.length || stops.some((stop) => !stopIds.includes(stop.id))) {
+      throw new ApiError(400, "Provide every destination stop exactly once")
+    }
+    // Move positions out of the occupied range before assigning the final order.
+    const offset = Math.max(0, ...stops.map((stop) => stop.order)) + stops.length + 1
+    await tx.tripStop.updateMany({ where: { tripId }, data: { order: { increment: offset } } })
+    for (const [order, id] of stopIds.entries()) await tx.tripStop.update({ where: { id }, data: { order } })
+  })
+}
+
+export async function autoPlanTrip(userId: string, tripId: string) {
+  await prisma.$transaction(async (tx) => {
+    await lockTrip(tx, userId, tripId)
+    const stops = await tx.tripStop.findMany({ where: { tripId }, include: { activities: true }, orderBy: { order: "asc" } })
+    if (!stops.length) throw new ApiError(400, "Add a destination before planning activities")
+    for (const stop of stops) {
+      // Preserve existing plans; repeated requests must not duplicate activities.
+      if (stop.activities.length) continue
+      const activities = await tx.activity.findMany({ where: { destinationId: stop.destinationId }, orderBy: { rating: "desc" }, take: Math.min(stop.daysCount * 2, 12) })
+      for (const [index, activity] of activities.entries()) {
+        const date = stop.startDate ? new Date(stop.startDate) : null
+        if (date) date.setUTCDate(date.getUTCDate() + Math.floor(index / 2))
+        if (date && stop.endDate && date > stop.endDate) break
+        await tx.tripActivity.create({ data: { tripStopId: stop.id, activityId: activity.id, title: activity.name,
+          category: activity.category, estimatedCost: activity.estimatedCost, duration: activity.duration,
+          scheduledDate: date, scheduledTime: index % 2 ? "15:00" : "10:00" } })
+      }
+    }
+  }, { timeout: 15000 })
+  return getTrip(userId, tripId)
 }
 
 export async function createShareLink(userId: string, tripId: string) {

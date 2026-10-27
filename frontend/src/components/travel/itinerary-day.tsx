@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { Clock, MapPin, Utensils, Camera, Bed, Car, ChevronDown, Plus, Edit2, Trash2 } from "lucide-react"
+import { Clock, MapPin, Utensils, Camera, Bed, Car, ChevronDown, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
@@ -23,6 +23,7 @@ interface ItineraryDayProps {
   city: string
   activities: Activity[]
   totalCost: number
+  currency?: string
   className?: string
   editable?: boolean
   onAddActivity?: (dayId: string) => void
@@ -51,6 +52,7 @@ export function ItineraryDay({
   city,
   activities,
   totalCost,
+  currency = "INR",
   className,
   editable = false,
   onAddActivity,
@@ -82,7 +84,7 @@ export function ItineraryDay({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-[#6EE7B7]">{formatCurrency(totalCost)}</span>
+          <span className="text-sm font-semibold text-[#6EE7B7]">{formatCurrency(totalCost, currency)}</span>
           <ChevronDown
             className={cn("w-4 h-4 text-muted-foreground transition-transform duration-200", expanded && "rotate-180")}
           />
@@ -142,7 +144,7 @@ export function ItineraryDay({
 
                       {/* Cost */}
                       <span className="text-xs font-semibold text-[#6EE7B7] flex-shrink-0">
-                        {formatCurrency(activity.estimatedCost)}
+                        {formatCurrency(activity.estimatedCost, currency)}
                       </span>
 
                       {/* Edit/delete actions */}

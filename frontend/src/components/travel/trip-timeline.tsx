@@ -18,23 +18,13 @@ interface Stop {
 
 interface TripTimelineProps {
   stops: Stop[]
+  currency?: string
   className?: string
   interactive?: boolean
   onStopClick?: (stopId: string) => void
 }
 
-const destinationImages: Record<string, string> = {
-  paris: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=400&auto=format&fit=crop",
-  tokyo: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400&auto=format&fit=crop",
-  bali: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=400&auto=format&fit=crop",
-  dubai: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400&auto=format&fit=crop",
-  rome: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=400&auto=format&fit=crop",
-  amsterdam: "https://images.unsplash.com/photo-1468376892789-d0b9e13da756?w=400&auto=format&fit=crop",
-  maldives: "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=400&auto=format&fit=crop",
-  barcelona: "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&auto=format&fit=crop",
-}
-
-export function TripTimeline({ stops, className, interactive = false, onStopClick }: TripTimelineProps) {
+export function TripTimeline({ stops, currency = "INR", className, interactive = false, onStopClick }: TripTimelineProps) {
   if (stops.length === 0) {
     return (
       <div className={cn("flex flex-col items-center justify-center py-12 text-center", className)}>
@@ -91,7 +81,7 @@ export function TripTimeline({ stops, className, interactive = false, onStopClic
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-semibold text-[#6EE7B7]">{formatCurrency(stop.estimatedCost)}</div>
+                  <div className="text-sm font-semibold text-[#6EE7B7]">{formatCurrency(stop.estimatedCost, currency)}</div>
                   {interactive && <ChevronRight className="w-4 h-4 text-muted-foreground mt-1 ml-auto group-hover:text-primary transition-colors" />}
                 </div>
               </div>

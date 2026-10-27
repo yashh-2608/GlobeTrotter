@@ -1,4 +1,4 @@
-import Image from "next/image"
+import { SafeImage as Image } from "@/components/travel/safe-image"
 import { MapPin, Share2 } from "lucide-react"
 import { notFound } from "next/navigation"
 import { auth } from "@/auth"
@@ -62,6 +62,7 @@ export default async function SharedTripPage({ params }: { params: Promise<{ slu
       <div className="max-w-7xl mx-auto px-6 py-14 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-5">
         <div className="space-y-5">
           <TripTimeline
+              currency={trip.currency}
             stops={trip.stops.map((stop) => ({
               id: stop.id,
               destinationId: stop.destinationId,

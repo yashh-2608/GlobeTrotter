@@ -5,7 +5,7 @@ import { CommunityClient } from "./community-client"
 
 export default async function CommunityPage() {
   const session = await auth()
-  const posts = await backendJson<CommunityPost[]>("/community").catch(() => [])
+  const posts = await backendJson<CommunityPost[]>("/community")
 
   return <CommunityClient initialPosts={posts} isAuthenticated={Boolean(session?.accessToken)} />
 }

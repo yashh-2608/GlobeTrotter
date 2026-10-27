@@ -31,11 +31,12 @@ export default async function BuilderPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-background">
+    <div className="min-h-screen bg-background">
       <BuilderClient
         tripId={trip.id}
         tripTitle={trip.title}
         stops={trip.stops}
+        currency={trip.currency}
       />
     </div>
   )

@@ -137,6 +137,7 @@ export interface UserProfile {
 export interface BudgetSummary {
   totalBudget: number
   spent: number
+  estimated: number
   remaining: number
   currency: string
   breakdown: {

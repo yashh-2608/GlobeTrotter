@@ -39,7 +39,7 @@ export function TripEditForm({ trip }: { trip: Trip }) {
           startDate: form.startDate || null,
           endDate: form.endDate || null,
           totalBudget: Number(form.totalBudget),
-          coverImage: form.coverImage || undefined,
+          coverImage: form.coverImage || null,
         }),
       })
       const payload = await response.json().catch(() => null)

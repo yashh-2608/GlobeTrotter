@@ -1,6 +1,6 @@
 "use client"
 
-import Image from "next/image"
+import { SafeImage as Image } from "@/components/travel/safe-image"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
@@ -8,7 +8,6 @@ import { MapPin, Calendar, ArrowRight, MoreHorizontal, Trash2, Edit } from "luci
 import { cn } from "@/lib/utils"
 import { formatCurrency, formatDate, getDaysRemaining } from "@/lib/utils"
 import { use3DTilt } from "@/hooks/use-3d-tilt"
-import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +23,7 @@ interface TripCardProps {
   startDate?: string | Date | null
   endDate?: string | Date | null
   totalBudget: number
+  currency?: string
   destinations?: string[]
   className?: string
   onDelete?: (id: string) => void
@@ -58,8 +58,8 @@ export function TripCard({
   coverImage,
   status,
   startDate,
-  endDate,
   totalBudget,
+  currency = "INR",
   destinations = [],
   className,
   onDelete,
@@ -99,9 +99,9 @@ export function TripCard({
         </div>
 
         {/* Actions */}
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 right-2 opacity-100 md:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           <DropdownMenu>
-            <DropdownMenuTrigger className="w-8 h-8 rounded-lg bg-black/40 backdrop-blur-sm flex items-center justify-center text-muted-foreground hover:text-foreground">
+            <DropdownMenuTrigger aria-label={`Actions for ${title}`} className="w-8 h-8 rounded-lg bg-black/40 backdrop-blur-sm flex items-center justify-center text-muted-foreground hover:text-foreground">
               <MoreHorizontal className="w-4 h-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="glass-stronger border-border bg-popover">
@@ -140,7 +140,7 @@ export function TripCard({
                 <span className="text-xs text-muted-foreground">{formatDate(startDate)}</span>
               </div>
             )}
-            <div className="text-sm font-semibold text-[#6EE7B7] mt-0.5">{formatCurrency(totalBudget)}</div>
+            <div className="text-sm font-semibold text-[#6EE7B7] mt-0.5">{formatCurrency(totalBudget, currency)}</div>
           </div>
 
           {daysRemaining !== null && status === "UPCOMING" && daysRemaining > 0 && (
