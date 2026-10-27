@@ -27,6 +27,10 @@ backend/dist/
 .DS_Store
 *.pem
 
+# local Claude tooling
+.claude/
+CLAUDE.md
+
 # debug
 npm-debug.log*
 yarn-debug.log*
